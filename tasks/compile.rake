@@ -11,24 +11,25 @@ CLEAN.include [
   'java/src/gherkin/lexer/*.java'
 ]
 
-desc "Compile the Java extensions"
-task :jar do
-  sh("ant -f java/build.xml")
+begin
+  require 'rake/extensiontask'
+  require 'rake/javaextensiontask'
+rescue LoadError
+  warn 'WARNING: Rake::JavaExtensionTask not installed. Will skip C and Java compilation.'
+  task :compile # no-op
 end
 
+java_task = Rake::JavaExtensionTask.new('gherkin') do |ext|
+  ext.ext_dir = 'java/src'
+  ext.debug   = true
+end if defined?(Rake::JavaExtensionTask)
+
 Gherkin::I18n.all.each do |i18n|
-  java = RagelTask.new('java', i18n)
-  rb   = RagelTask.new('rb', i18n)
+  rb   = RagelTask.new('rb',   i18n)
+  c    = RagelTask.new('c',    i18n) if defined?(Rake::ExtensionTask) && !defined?(JRUBY_VERSION)
+  java = RagelTask.new('java', i18n) if defined?(Rake::JavaExtensionTask)
 
-  task :jar     => java.target
-  task :jar     => rb.target
-
-  begin
-  unless defined?(JRUBY_VERSION)
-    require 'rake/extensiontask'
-
-    c = RagelTask.new('c', i18n)
-
+  if defined?(Rake::ExtensionTask) && !defined?(JRUBY_VERSION)
     extconf = "ext/gherkin_lexer_#{i18n.sanitized_key}/extconf.rb"
     file extconf do
       FileUtils.mkdir(File.dirname(extconf)) unless File.directory?(File.dirname(extconf))
@@ -60,11 +61,12 @@ EOF
     Rake::Task["compile"].prerequisites.unshift(c.target)
     Rake::Task["compile"].prerequisites.unshift(rb.target)
   end
-  rescue LoadError
-    unless defined?($c_warned)
-      warn "WARNING: Rake::ExtensionTask not installed. Skipping C compilation." 
-      $c_warned = true
-      task :compile # no-op
-    end
+
+  if defined?(Rake::JavaExtensionTask)
+    Rake::Task['compile:java'].prerequisites.unshift(java.target)
+    Rake::Task['compile:java'].prerequisites.unshift(rb.target)
+    # Another hack: Rake-Compiler internal source_files is memoized and set too
+    # early, thus we have to force append Ragel-generated .java files.
+    java_task.instance_variable_get(:@source_files) << java.target
   end
 end

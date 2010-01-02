@@ -17,7 +17,7 @@ begin
     gem.add_dependency "trollop", ">= 1.15"
     gem.add_development_dependency "rspec", ">= 1.2.9"
     gem.add_development_dependency "cucumber", ">= 0.5.1"
-    gem.add_development_dependency "rake-compiler", ">= 0.7.0" unless defined?(JRUBY_VERSION)
+    gem.add_development_dependency "rake-compiler", ">= 0.7.0"
     
     case ENV['PLATFORM']
     when 'java'
@@ -44,5 +44,5 @@ end
 Dir['tasks/**/*.rake'].each { |rake| load File.expand_path(rake) }
 
 task :default  => [:spec, :cucumber]
-task :spec     => defined?(JRUBY_VERSION) ? :jar : :compile
-task :cucumber => defined?(JRUBY_VERSION) ? :jar : :compile
+task :spec     => :compile
+task :cucumber => :compile
